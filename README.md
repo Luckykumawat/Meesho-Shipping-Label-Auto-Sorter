@@ -78,18 +78,6 @@ Resellers handling bulk orders
 
 Automated pickup arrangement
 
-🛠️ Installation
-1️⃣ Clone the Repository
-git clone https://github.com/YOUR_USERNAME/meesho-label-sorter.git
-cd meesho-label-sorter
-
-2️⃣ Create Virtual Environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-3️⃣ Install Required Libraries
-pip install pymupdf pypdf pillow easyocr numpy
-
 
 👉 macOS users also need Poppler only if using pdf2image (not required here).
 
