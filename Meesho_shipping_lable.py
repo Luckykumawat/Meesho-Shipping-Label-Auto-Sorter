@@ -24,7 +24,7 @@ def detect_carrier(text):
 
 def sort_shipping_labels(input_pdf_path, output_pdf_path, use_easyocr=True):
     CARRIER_PRIORITY = {
-        "VALMO PICKUP": 1,
+        "VALMO PICKUP": 1,# Change the Delivery sevice according to your repuirement
         "SHADOWFAX PICKUP": 2,
         "DELHIVERY PICKUP": 3,
         "XPRESS BEES": 4,
@@ -90,7 +90,7 @@ def sort_shipping_labels(input_pdf_path, output_pdf_path, use_easyocr=True):
 
 
 # Run
-INPUT_FILENAME = "/Users/bci/Desktop/Meesho_Automation/meesho_lable/quicklabelcrop-1763607691742.pdf"
-OUTPUT_FILENAME = "/Users/bci/Desktop/Meesho_Automation/meesho_lable/Sorted_Labels_By_Carrier.pdf"
+INPUT_FILENAME = "INPUT_FILE_PATH.pdf"
+OUTPUT_FILENAME = "OUTPUT_FILE_PATH.pdf"
 
 sort_shipping_labels(INPUT_FILENAME, OUTPUT_FILENAME)
