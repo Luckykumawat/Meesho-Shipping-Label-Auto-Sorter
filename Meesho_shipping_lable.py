@@ -4,8 +4,14 @@ import fitz  # PyMuPDF
 from PIL import Image
 import numpy as np
 import easyocr
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from tkinter import ttk
 
-# ---- Strong Carrier Matching ----
+
+# ----------------------------
+# Strong Carrier Keyword Detection
+# ----------------------------
 CARRIER_KEYWORDS = {
     "VALMO PICKUP": ["VALMO", "VALMO PICK", "VALMO PICKUP"],
     "SHADOWFAX PICKUP": ["SHADOWFAX", "SHADOW FAX", "SHADOFAX", "SHADOWFAX PICKUP"],
@@ -15,68 +21,64 @@ CARRIER_KEYWORDS = {
 
 def detect_carrier(text):
     text = text.upper()
-    for carrier, keywords in CARRIER_KEYWORDS.items():
-        for word in keywords:
-            if word in text:
+    for carrier, words in CARRIER_KEYWORDS.items():
+        for w in words:
+            if w in text:
                 return carrier
     return "UNKNOWN"
 
 
-def sort_shipping_labels(input_pdf_path, output_pdf_path, use_easyocr=True):
+# ----------------------------
+# Main Sorting Function
+# ----------------------------
+def sort_shipping_labels(input_pdf_path, output_pdf_path, progress_label):
+
     CARRIER_PRIORITY = {
-        "VALMO PICKUP": 1,# Change the Delivery sevice according to your repuirement
+        "VALMO PICKUP": 1,
         "SHADOWFAX PICKUP": 2,
         "DELHIVERY PICKUP": 3,
         "XPRESS BEES": 4,
         "UNKNOWN": 99
     }
 
-    # Init EasyOCR
-    reader = None
-    if use_easyocr:
-        reader = easyocr.Reader(['en'], gpu=False)
+    # Init OCR
+    reader = easyocr.Reader(['en'], gpu=False)
 
     # Load PDF
     doc = fitz.open(input_pdf_path)
     pdf_reader = pypdf.PdfReader(input_pdf_path)
 
-    print(f"Total Pages: {doc.page_count}")
-
     carrier_pages = []
     unknown_count = 0
 
-    # Loop each page
-    for i in range(doc.page_count):
-        page_number = i + 1
+    total_pages = doc.page_count
+
+    # Loop pages
+    for i in range(total_pages):
+        page_num = i + 1
+        progress_label.config(text=f"Processing Page {page_num}/{total_pages}...")
+        progress_label.update()
+
         page = doc[i]
 
-        # Convert PDF page to image
+        # Convert to image
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
 
-        # OCR text extraction
-        if use_easyocr:
-            ocr_result = reader.readtext(np.array(img))
-            text = " ".join([item[1] for item in ocr_result]) if ocr_result else ""
-        else:
-            import pytesseract
-            text = pytesseract.image_to_string(img)
+        # OCR
+        ocr_result = reader.readtext(np.array(img))
+        text = " ".join([item[1] for item in ocr_result]) if ocr_result else ""
 
-        # Detect courier partner
-        found_carrier = detect_carrier(text)
-        priority = CARRIER_PRIORITY.get(found_carrier, 99)
+        # Carrier detection
+        carrier = detect_carrier(text)
+        priority = CARRIER_PRIORITY.get(carrier, 99)
 
-        print(f"[Page {page_number}] Carrier Detected: {found_carrier}")
+        carrier_pages.append((priority, page_num, carrier, pdf_reader.pages[i]))
 
-        if found_carrier == "UNKNOWN":
-            unknown_count += 1
-
-        carrier_pages.append((priority, page_number, found_carrier, pdf_reader.pages[i]))
-
-    # Sort by assigned priority
+    # Sort pages
     carrier_pages.sort(key=lambda x: x[0])
 
-    # Write new sorted PDF
+    # Write output
     writer = pypdf.PdfWriter()
     for _, _, _, page in carrier_pages:
         writer.add_page(page)
@@ -84,13 +86,78 @@ def sort_shipping_labels(input_pdf_path, output_pdf_path, use_easyocr=True):
     with open(output_pdf_path, "wb") as f:
         writer.write(f)
 
-    print("\n✓ Sorting Complete!")
-    print(f"✓ Saved at: {output_pdf_path}")
-    print(f"⚠ Unknown Pages: {unknown_count}")
+    progress_label.config(text=f"Completed! Saved to: {output_pdf_path}")
 
 
-# Run
-INPUT_FILENAME = "INPUT_FILE_PATH.pdf"
-OUTPUT_FILENAME = "OUTPUT_FILE_PATH.pdf"
+# ----------------------------
+# GUI Application
+# ----------------------------
+def open_file():
+    filepath = filedialog.askopenfilename(
+        filetypes=[("PDF Files", "*.pdf")]
+    )
+    if filepath:
+        input_path_var.set(filepath)
 
-sort_shipping_labels(INPUT_FILENAME, OUTPUT_FILENAME)
+
+def run_sorting():
+    input_pdf = input_path_var.get().strip()
+
+    if input_pdf == "":
+        messagebox.showerror("Error", "Please select an input PDF file!")
+        return
+
+    output_pdf = filedialog.asksaveasfilename(
+        defaultextension=".pdf",
+        filetypes=[("PDF Files", "*.pdf")],
+        title="Save Sorted PDF As"
+    )
+
+    if output_pdf == "":
+        return
+
+    progress_label.config(text="Starting OCR...")
+    progress_label.update()
+
+    try:
+        sort_shipping_labels(input_pdf, output_pdf, progress_label)
+        messagebox.showinfo("Success", f"Sorted PDF saved successfully:\n{output_pdf}")
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+
+# ----------------------------
+# Tkinter UI
+# ----------------------------
+root = tk.Tk()
+root.title("Shipping Label Sorter - Meesho Automation")
+root.geometry("600x300")
+root.resizable(False, False)
+
+title = tk.Label(root, text="📦 Shipping Label Sorting Automation", font=("Arial", 16, "bold"))
+title.pack(pady=10)
+
+instruction = tk.Label(root, text="Upload a Meesho shipping label PDF to auto-sort by courier partner.")
+instruction.pack(pady=5)
+
+# PDF Path Input
+input_path_var = tk.StringVar()
+
+path_frame = tk.Frame(root)
+path_frame.pack(pady=10)
+
+path_entry = tk.Entry(path_frame, textvariable=input_path_var, width=50)
+path_entry.pack(side="left", padx=5)
+
+browse_btn = ttk.Button(path_frame, text="Browse", command=open_file)
+browse_btn.pack(side="left")
+
+# Run Button
+run_btn = ttk.Button(root, text="Sort Labels", command=run_sorting)
+run_btn.pack(pady=15)
+
+# Progress Label
+progress_label = tk.Label(root, text="", fg="blue")
+progress_label.pack(pady=10)
+
+root.mainloop()
